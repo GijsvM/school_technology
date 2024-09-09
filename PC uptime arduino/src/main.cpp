@@ -51,7 +51,8 @@ void loop()
   {
     time = millis();
     Serial.write(0x1a);
-    Serial.println("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nuptime:");
+    Serial.println("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n--------------------------------------------------------------------------------------------------------------------");
+    Serial.println("uptime:");
     Serial.print("sec: ");
     Serial.println(myTimeSec);
     Serial.print("min: ");
@@ -61,5 +62,7 @@ void loop()
 
     Serial.print("day: ");
     Serial.println(myTimeDay);
+        Serial.println("--------------------------------------------------------------------------------------------------------------------");
+
   }
 }
