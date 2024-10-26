@@ -39,12 +39,11 @@ if(buttonstate2 == LOW){
 if (TempShow){
 Display.show(t);
 delay(100);
-
 }
+
 if (HumShow){
 Display.show(h);
 delay(100);
-
 }
 
 
@@ -61,7 +60,6 @@ if(t>30.00){
   digitalWrite(4,LOW);
   delay(200);
 }
-
 if(h < 20.00){
   digitalWrite(4,HIGH);
   delay(200);
@@ -74,5 +72,4 @@ if(h > 70.00){
   digitalWrite(7,LOW);
   delay(200);
 }
-
 }

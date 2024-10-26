@@ -1,18 +1,51 @@
 #include <Arduino.h>
+float num1;
+float num2;
+char oper;
+float antwoord;
 
-// put function declarations here:
-int myFunction(int, int);
+void setup()
+{
+    Serial.begin(9600); // begins serial  communications
+    Serial.println("typ de berekening");
+    Serial.println("b.v.b: 2+3\n");
+}
+void calc()
+{
 
-void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+    switch (oper)
+    {
+
+    case '+':
+        antwoord = num1 + num2;
+        break;
+
+    case '-':
+        antwoord = num1 - num2;
+        break;
+
+    case '*':
+        antwoord = num1 * num2;
+        break;
+
+    case '/':
+        antwoord = num1 / num2;
+        break;
+    }
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
-}
+void loop()
+{
+    while (Serial.available() > 0)
+    {
+        num1 = Serial.parseFloat();
+        oper = Serial.read();
+        num2 = Serial.parseFloat();
 
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+        calc();
+
+        Serial.println("het antwoord is: ");
+        Serial.println(antwoord);
+        Serial.println();
+    }
 }
