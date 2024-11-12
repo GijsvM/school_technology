@@ -5,7 +5,7 @@
 
 const int luchtSensorPin = 36;
 const int vochtigheidSensorPin = 39;
-const int pompPin = 26;
+const int pompPin = 25;
 
 const char* ssid = "NETLAB-OIL460";
 const char* password = "Startsemester";
@@ -15,10 +15,15 @@ const char* serverName = "http://192.168.68.92:8080/plantData/1";
 
 unsigned long lastTime = 0;
 unsigned long timerDelay = 11000;
+unsigned long sensorReadInterval = 10000;
+unsigned long pumpOnDuration = 1000; // Pump active duration in milliseconds
+unsigned long lastSensorReadTime = 0;
+unsigned long pumpStartTijd = 0;
+
 String sensorReadings;
 float sensorReadingsArr[3];
+bool pumpActive = false;
 
-// Function prototype for httpGETRequest
 String httpGETRequest(const char* serverName);
 
 void setup() {
@@ -30,57 +35,63 @@ void setup() {
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
     Serial.println("Connecting to WiFi...");
+    delay(1000);
   }
   Serial.println("Connected to WiFi");
 }
 
 void loop() {
-  int tijd = millis();
+  unsigned long currentMillis = millis();
   int lucht;
   int vochtigheid;
 
-  if ((millis() - lastTime) > timerDelay) {
+  // Check if it's time to send HTTP GET request
+  if (currentMillis - lastTime > timerDelay) {
     if (WiFi.status() == WL_CONNECTED) {
       sensorReadings = httpGETRequest(serverName);
-      
-      // Check if sensorReadings is empty
+
       if (sensorReadings == "{}" || sensorReadings == "") {
         Serial.println("Empty response received, skipping JSON parsing");
-        return;
-      }
-      
-      JSONVar myObject = JSON.parse(sensorReadings);
-  
-      if (JSON.typeof(myObject) == "undefined") {
-        Serial.println("Parsing input failed!");
-        return;
-      }
-    
-      JSONVar keys = myObject.keys();
-    
-      for (int i = 0; i < keys.length(); i++) {
-        JSONVar value = myObject[keys[i]];
-        Serial.println(value); 
-        if (value) {
-          // Uncomment below to activate pump
-          digitalWrite(pompPin, HIGH);
-          Serial.println("Pump activated.");
-          delay(1000);
-          digitalWrite(pompPin,LOW);
+      } else {
+        JSONVar myObject = JSON.parse(sensorReadings);
+
+        if (JSON.typeof(myObject) == "undefined") {
+          Serial.println("Parsing input failed!");
         } else {
-          // Uncomment below to deactivate pump
-          digitalWrite(pompPin, LOW);
+          JSONVar keys = myObject.keys();
+          
+          for (int i = 0; i < keys.length(); i++) {
+            JSONVar value = myObject[keys[i]];
+            Serial.println(value); 
+
+            if (value) {
+              pumpActive = true;
+              pumpStartTijd = currentMillis;
+              digitalWrite(pompPin, HIGH);
+              Serial.println("Pump activated.");
+            } else {
+              digitalWrite(pompPin, LOW);
+              pumpActive = false;
+            }
+          }
         }
       }
     } else {
       Serial.println("WiFi Disconnected");
     }
-    lastTime = millis();
+    lastTime = currentMillis;
   }
 
-  if (tijd % 10000 == 0) {
+  // Turn off the pump after the duration has elapsed
+  if (pumpActive && (currentMillis - pumpStartTijd >= pumpOnDuration)) {
+    digitalWrite(pompPin, LOW);
+    pumpActive = false;
+    Serial.println("Pump deactivated.");
+  }
+
+  // Periodic sensor readings and POST request
+  if (currentMillis - lastSensorReadTime >= sensorReadInterval) {
     lucht = analogRead(luchtSensorPin);
     vochtigheid = analogRead(vochtigheidSensorPin);  // dry = 1600, in water = 700
     Serial.print("Humidity: ");  
@@ -88,45 +99,33 @@ void loop() {
     Serial.print("Air quality: ");  
     Serial.println(lucht, DEC);
     Serial.println();
-    Serial.println(tijd);
-    Serial.println();
-    delay(100);
-  }
 
-  if (tijd % 10000 == 0) {
-    if (WiFi.status() == WL_CONNECTED) { // Check Wi-Fi connection status
+    if (WiFi.status() == WL_CONNECTED) {
       HTTPClient http;
+      http.begin(serverURL);
+      http.addHeader("Content-Type", "application/json");
 
-      http.begin(serverURL); // Specify request destination
-      http.addHeader("Content-Type", "application/json"); // Specify content-type header
-
-      // Data to send in the POST request body
       String postData = "{\"plantID\": 1, \"vochtigheid\": " + String(vochtigheid) + ", \"luchtKwaliteid\": " + String(lucht) + " }";
-      int httpResponseCode = http.POST(postData); // Send HTTP POST request
+      int httpResponseCode = http.POST(postData);
       Serial.println("POST data: " + postData);
 
-      // Check the response code
       if (httpResponseCode > 0) {
-        String response = http.getString(); // Get the response to the request
-        Serial.println(httpResponseCode);    // Print the response code
-        Serial.println(response);            // Print the response payload
+        String response = http.getString();
+        Serial.println(httpResponseCode);
+        Serial.println(response);
       } else {
         Serial.print("Error on sending POST: ");
         Serial.println(httpResponseCode);
       }
 
-      http.end(); // End the HTTP request
-      Serial.println();
-      Serial.println(tijd);
-      Serial.println();
-      delay(100);
+      http.end();
     } else {
       Serial.println("WiFi Disconnected");
     }
+    lastSensorReadTime = currentMillis;
   }
 }
 
-// Definition for httpGETRequest function
 String httpGETRequest(const char* serverName) {
   WiFiClient client;
   HTTPClient http;
